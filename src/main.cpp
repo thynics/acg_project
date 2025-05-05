@@ -6,10 +6,10 @@
 #include "Camera.h"
 #include "Model.h"
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void processInput(GLFWwindow *window);
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
 // 屏幕尺寸
 const unsigned int SCR_WIDTH = 800;
@@ -25,7 +25,8 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-int main() {
+int main()
+{
     // 初始化 GLFW
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -33,8 +34,9 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // 创建窗口
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OBJ Model Viewer", NULL, NULL);
-    if (!window) {
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OBJ Model Viewer", NULL, NULL);
+    if (!window)
+    {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return -1;
@@ -46,7 +48,8 @@ int main() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // 捕获鼠标
 
     // 初始化 GLAD
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
         std::cerr << "Failed to initialize GLAD\n";
         return -1;
     }
@@ -55,25 +58,21 @@ int main() {
 
     Shader shader("shaders/default.vert", "shaders/default.frag");
 
+    Model model("assets/model.obj");
 
-    Model model("assets/tower.obj");
+    while (!glfwWindowShouldClose(window))
+    {
 
-
-    while (!glfwWindowShouldClose(window)) {
-       
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-
         processInput(window);
-
 
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader.use();
-
 
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
@@ -82,7 +81,6 @@ int main() {
         glUniformMatrix4fv(glGetUniformLocation(shader.ID(), "view"), 1, GL_FALSE, &view[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(shader.ID(), "projection"), 1, GL_FALSE, &projection[0][0]);
 
-     
         glm::mat4 modelMat = glm::mat4(1.0f);
         glUniformMatrix4fv(glGetUniformLocation(shader.ID(), "model"), 1, GL_FALSE, &modelMat[0][0]);
 
@@ -96,7 +94,8 @@ int main() {
     return 0;
 }
 
-void processInput(GLFWwindow* window) {
+void processInput(GLFWwindow *window)
+{
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -110,14 +109,15 @@ void processInput(GLFWwindow* window) {
         camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
 }
 
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
+{
     glViewport(0, 0, width, height);
 }
 
-
-void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (firstMouse) {
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    if (firstMouse)
+    {
         lastX = static_cast<float>(xpos);
         lastY = static_cast<float>(ypos);
         firstMouse = false;
@@ -131,7 +131,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
