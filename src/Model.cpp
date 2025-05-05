@@ -38,17 +38,14 @@ void Model::loadModel(const std::string& path) {
 
 Mesh Model::processShape(const tinyobj::attrib_t& attrib,
                          const tinyobj::shape_t& shape,
-                         const std::vector<tinyobj::material_t>& /*materials*/) {
+                         const std::vector<tinyobj::material_t>& materials) {
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-
-    std::unordered_map<std::string, unsigned int> uniqueVertexMap;
 
     for (size_t i = 0; i < shape.mesh.indices.size(); i++) {
         tinyobj::index_t idx = shape.mesh.indices[i];
 
         Vertex vertex{};
-
         vertex.Position = glm::vec3(
             attrib.vertices[3 * idx.vertex_index + 0],
             attrib.vertices[3 * idx.vertex_index + 1],
@@ -62,7 +59,7 @@ Mesh Model::processShape(const tinyobj::attrib_t& attrib,
                 attrib.normals[3 * idx.normal_index + 2]
             );
         } else {
-            vertex.Normal = glm::vec3(0.0f); // fallback
+            vertex.Normal = glm::vec3(0.0f);
         }
 
         if (idx.texcoord_index >= 0) {
@@ -71,12 +68,19 @@ Mesh Model::processShape(const tinyobj::attrib_t& attrib,
                 attrib.texcoords[2 * idx.texcoord_index + 1]
             );
         } else {
-            vertex.TexCoords = glm::vec2(0.0f); // fallback
+            vertex.TexCoords = glm::vec2(0.0f);
         }
 
         vertices.push_back(vertex);
         indices.push_back(static_cast<unsigned int>(indices.size()));
     }
 
-    return Mesh(vertices, indices, {});
+    glm::vec3 diffuseColor(1.0f); // default white
+    int matID = shape.mesh.material_ids.empty() ? -1 : shape.mesh.material_ids[0];
+    if (matID >= 0 && matID < materials.size()) {
+        const auto& mat = materials[matID];
+        diffuseColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+    }
+
+    return Mesh(vertices, indices, diffuseColor);
 }
