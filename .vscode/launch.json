@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Launch OpenGLApp (MSVC)",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/build/bin/Debug/OpenGLApp.exe",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "console": "externalTerminal",
+        "preLaunchTask": "build with CMake"
+      }
+    ]
+  }
+  

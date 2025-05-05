@@ -1,0 +1,14 @@
+C:/Code/CG/ACG_Project/build/CMakeFiles/glad.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/tinyobjloader.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/stb_image.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/OpenGLApp.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/INSTALL.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/ALL_BUILD.dir
+C:/Code/CG/ACG_Project/build/CMakeFiles/ZERO_CHECK.dir
+C:/Code/CG/ACG_Project/build/external/glfw/CMakeFiles/uninstall.dir
+C:/Code/CG/ACG_Project/build/external/glfw/CMakeFiles/INSTALL.dir
+C:/Code/CG/ACG_Project/build/external/glfw/CMakeFiles/ALL_BUILD.dir
+C:/Code/CG/ACG_Project/build/external/glfw/src/CMakeFiles/glfw.dir
+C:/Code/CG/ACG_Project/build/external/glfw/src/CMakeFiles/update_mappings.dir
+C:/Code/CG/ACG_Project/build/external/glfw/src/CMakeFiles/INSTALL.dir
+C:/Code/CG/ACG_Project/build/external/glfw/docs/CMakeFiles/INSTALL.dir
