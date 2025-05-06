@@ -2,6 +2,7 @@
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include <unordered_map>
+#include <limits> // for std::numeric_limits
 
 Model::Model(const std::string& path) {
     loadModel(path);
@@ -83,4 +84,32 @@ Mesh Model::processShape(const tinyobj::attrib_t& attrib,
     }
 
     return Mesh(vertices, indices, diffuseColor);
+}
+
+
+
+
+std::pair<glm::vec3, glm::vec3> Model::CalculateWorldAABB(const glm::mat4& modelMatrix) const {
+    glm::vec3 minBound(
+        std::numeric_limits<float>::max(),
+        std::numeric_limits<float>::max(),
+        std::numeric_limits<float>::max());
+
+    glm::vec3 maxBound(
+        std::numeric_limits<float>::lowest(),
+        std::numeric_limits<float>::lowest(),
+        std::numeric_limits<float>::lowest());
+
+    for (const auto& mesh : meshes) {
+        for (const auto& vertex : mesh.vertices) {
+            // 将顶点从模型空间转换到世界空间
+            glm::vec4 worldPos = modelMatrix * glm::vec4(vertex.Position, 1.0f);
+            glm::vec3 pos = glm::vec3(worldPos);
+
+            minBound = glm::min(minBound, pos);
+            maxBound = glm::max(maxBound, pos);
+        }
+    }
+
+    return { minBound, maxBound }; // World-space AABB
 }

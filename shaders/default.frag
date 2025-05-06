@@ -1,9 +1,10 @@
-#version 330 core
+#version 420
 
 out vec4 FragColor;
 
 in vec3 FragPos;
 in vec3 Normal;
+in vec4 shadowMapCoord;
 
 uniform vec3 material_diffuseColor;
 
@@ -16,9 +17,19 @@ struct PointLight {
 
 uniform PointLight light;
 
+struct DirLight {
+    vec3 dir;
+    vec3 color;
+};
+
+uniform DirLight dirLight;
+
+layout(binding = 10) uniform sampler2DShadow shadowMapTex;
+//layout(binding = 10) uniform sampler2D shadowMapTex;
+
 void main()
 {
-    vec3 norm = normalize(Normal);
+    /*vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(light.position - FragPos);
 
     // 漫反射
@@ -33,5 +44,29 @@ void main()
 
     vec3 result = diffuse + specular;
 
+    FragColor = vec4(result, 1.0);*/
+
+    float visibility = textureProj(shadowMapTex, shadowMapCoord);
+    // float depth = texture(shadowMapTex, shadowMapCoord.xy / shadowMapCoord.w).r;
+    // float bias = 0.005f;
+    // float visibility = (depth + bias >= (shadowMapCoord.z / shadowMapCoord.w)) ? 1.0 : 0.0;
+
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(dirLight.dir);
+
+    // 漫反射
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * material_diffuseColor * dirLight.color;
+
+    // 镜面反射（可选）
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0); // shininess=32
+    vec3 specular = spec * dirLight.color;
+
+    vec3 result = visibility * (diffuse + specular);
+
     FragColor = vec4(result, 1.0);
+
+    
 }
