@@ -11,6 +11,10 @@
 #include "Camera.h"
 #include "Model.h"
 #include "ShadowMap.h"
+#include "csm.h"
+
+// #define USE_SM
+#define USE_CSM
 
 
 
@@ -69,15 +73,23 @@ int main()
     // 加载着色器
     Shader shader("shaders/default.vert", "shaders/default.frag");
     Shader shaderDepth("shaders/depth.vert", "shaders/depth.frag");
+    Shader shaderCSM("shaders/csm_shading.vert", "shaders/csm_shading.frag");
+
+    Shader activeShader = shader;
 
     // 加载模型
     Model model("assets/model.obj");
     std::pair<glm::vec3, glm::vec3> temp = model.CalculateWorldAABB(glm::mat4(1.0f));
     std::cout << temp.first.x << " " << temp.first.y << " " << temp.first.z << std::endl;
     std::cout << temp.second.x << " " << temp.second.y << " " << temp.second.z << std::endl;
+    
+    int shadowMapResolution = 1024;
+    ShadowMap sm(shadowMapResolution, shadowMapResolution);
 
-
-    ShadowMap sm(1024, 1024);
+    int cascadeCount = 4;
+    float camNearPlane = 0.1f;
+    float camFarPlane = 100.0f;
+    CSM csm(cascadeCount, shadowMapResolution, camNearPlane, camFarPlane);
 
     // 渲染循环
     while (!glfwWindowShouldClose(window))
@@ -94,10 +106,18 @@ int main()
         glm::vec3 lightColor(1.0f);
 
         glm::mat4 matModel = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
+                                                (float)SCR_WIDTH / (float)SCR_HEIGHT,
+                                                camNearPlane, camFarPlane);
 
-
-        DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);
-
+        #ifdef USE_SM
+            DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);
+        #endif
+        #ifdef USE_CSM
+            csm.ComputeLightSpaceMatrix(view, projection, matModel, camera.Position, camera.Front, model, lightDir);
+            csm.DrawShadowMaps(shaderCSM, model, matModel);
+        #endif
 
         // 清屏
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -105,37 +125,46 @@ int main()
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // 设置 Shader 和变换矩阵
-        shader.use();
-
-        // 绑定texture
-        glActiveTexture(GL_TEXTURE10);
-        glBindTexture(GL_TEXTURE_2D, sm.GetDepthMapTexture());
-
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
-                                                (float)SCR_WIDTH / (float)SCR_HEIGHT,
-                                                0.1f, 100.0f);
-        glm::mat4 lightMatrix = glm::translate(glm::vec3(0.5f)) * glm::scale(glm::vec3(0.5f)) * sm.matProj * sm.matView;
-
-        shader.setMat4("view", view);
-        shader.setMat4("projection", projection);
-        shader.setMat4("model", matModel);
-        shader.setMat4("lightMatrix", lightMatrix);
-
-        // 设置点光源
-        // glm::vec3 lightPos(1.5f, 2.0f, 2.0f);
-        // glm::vec3 lightColor(1.0f); // 白光
-
-        // shader.setVec3("light.position", lightPos);
-        // shader.setVec3("light.color", lightColor);
+        #ifdef USE_SM
+            // 设置 Shader 和变换矩阵
+            activeShader = shader;
+            //shader.use();
+            // 绑定texture
+            glActiveTexture(GL_TEXTURE10);
+            glBindTexture(GL_TEXTURE_2D, sm.GetDepthMapTexture());
+        #endif
+        #ifdef USE_CSM
+            //shaderCSM.use();
+            activeShader = shaderCSM;
+            glActiveTexture(GL_TEXTURE10);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, csm.GetShadowMapArrayTexture());
+        #endif
+       
         
 
-        shader.setVec3("dirLight.dir", lightDir);
-        shader.setVec3("dirLight.color", lightColor);
-
+        activeShader.use();
+        activeShader.setMat4("view", view);
+        activeShader.setMat4("projection", projection);
+        activeShader.setMat4("model", matModel);
+        activeShader.setVec3("dirLight.dir", lightDir);
+        activeShader.setVec3("dirLight.color", lightColor);
         // 设置摄像机位置用于计算镜面反射
-        shader.setVec3("viewPos", camera.Position);
+        activeShader.setVec3("viewPos", camera.Position);
+
+        #ifdef USE_SM
+            glm::mat4 lightMatrix = glm::translate(glm::vec3(0.5f)) * glm::scale(glm::vec3(0.5f)) * sm.matProj * sm.matView;
+            activeShader.setMat4("lightMatrix", lightMatrix);
+        #endif
+        #ifdef USE_CSM
+            std::vector<float> cascadeSplit = csm.GetCascadeSplits();
+            std::vector<glm::mat4> lightMatrices = csm.GetLightSpaceMatrices();
+            for (int i = 0; i < cascadeCount; i++){
+                std::string float_name = "cascadeSplit[" + std::to_string(i) + "]"; 
+                activeShader.setFloat(float_name, cascadeSplit[i]);
+                std::string mat4_name = "lightMatrices[" + std::to_string(i) + "]";
+                activeShader.setMat4(mat4_name, lightMatrices[i]);
+            }
+        #endif
 
         // 渲染模型
         model.Draw(shader);
@@ -163,13 +192,6 @@ void DrawShadowMap(Shader &shader, ShadowMap &sm, Model &model, glm::mat4& matMo
     glm::vec3 shadowMapUp(0.0f, 1.0f, 0.0f);
     glm::mat4 matShadowView = glm::lookAt(shadowMapEye, shadowMapAt, shadowMapUp);
     glm::mat4 matShadowProj = glm::ortho(-radius, radius, -radius, radius, 0.1f, radius * 2.0f);
-
-    // glm::vec3 shadowMapEye(5.0f, 5.0f, 5.0f);
-    // glm::vec3 shadowMapAt(0.0f);
-    // glm::vec3 shadowMapUp(0.0f, 1.0f, 0.0f);
-    // glm::mat4 matShadowView = glm::lookAt(shadowMapEye, shadowMapAt, shadowMapUp);
-    // float radius = 5;
-    // glm::mat4 matShadowProj = glm::ortho(-radius, radius, -radius, radius, 0.1f, radius * 2.0f);
 
     sm.matView = matShadowView;
     sm.matProj = matShadowProj;
