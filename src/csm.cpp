@@ -14,6 +14,9 @@ CSM::CSM(unsigned int cascadesCount, unsigned int shadowMapResolution, float nea
     shadowViewProjMatrices.resize(cascadesCount);
     InitShadowMaps();
     ComputeCascadeSplits();
+
+    polygonOffset_factor = 0.25f;
+    polygonOffset_units = 100000.0f;
 }
 
 CSM::~CSM() {
@@ -127,6 +130,8 @@ void CSM::DrawShadowMaps(Shader &shader, Model &model, glm::mat4& matModel)
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
         // TODO: PolygonOffset
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(polygonOffset_factor, polygonOffset_units);
 
         shader.use();
         shader.setMat4("modelViewProjectionMatrix", shadowViewProjMatrices[i]*matModel);
@@ -135,6 +140,7 @@ void CSM::DrawShadowMaps(Shader &shader, Model &model, glm::mat4& matModel)
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 GLuint CSM::GetShadowMapArrayTexture() const

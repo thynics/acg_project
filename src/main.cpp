@@ -13,7 +13,7 @@
 #include "ShadowMap.h"
 #include "csm.h"
 
-// #define USE_SM
+//#define USE_SM
 #define USE_CSM
 
 
@@ -116,7 +116,7 @@ int main()
         #endif
         #ifdef USE_CSM
             csm.ComputeLightSpaceMatrix(view, projection, matModel, camera.Position, camera.Front, model, lightDir);
-            csm.DrawShadowMaps(shaderCSM, model, matModel);
+            csm.DrawShadowMaps(shaderDepth, model, matModel);
         #endif
 
         // 清屏
@@ -160,14 +160,14 @@ int main()
             std::vector<glm::mat4> lightMatrices = csm.GetLightSpaceMatrices();
             for (int i = 0; i < cascadeCount; i++){
                 std::string float_name = "cascadeSplit[" + std::to_string(i) + "]"; 
-                activeShader.setFloat(float_name, cascadeSplit[i]);
+                activeShader.setFloat(float_name, cascadeSplit[i+1]);
                 std::string mat4_name = "lightMatrices[" + std::to_string(i) + "]";
                 activeShader.setMat4(mat4_name, lightMatrices[i]);
             }
         #endif
 
         // 渲染模型
-        model.Draw(shader);
+        model.Draw(activeShader);
 
         // 交换缓冲和事件
         glfwSwapBuffers(window);

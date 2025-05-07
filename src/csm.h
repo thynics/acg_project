@@ -32,6 +32,9 @@ private:
     float nearPlane;
     float farPlane;
 
+    float polygonOffset_factor;
+    float polygonOffset_units;
+
     GLuint depthMapFBO;
     GLuint shadowMapArray;
 
