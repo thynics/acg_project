@@ -13,8 +13,8 @@
 #include "ShadowMap.h"
 #include "csm.h"
 
-//#define USE_SM
-#define USE_CSM
+#define USE_SM
+//#define USE_CSM
 
 
 
@@ -138,7 +138,7 @@ int main()
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir(-1, 1, 1); // 从着色点指向光源
+        glm::vec3 lightDir(--1, 1, -1); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
 
         glm::mat4 matModel = glm::mat4(1.0f);
