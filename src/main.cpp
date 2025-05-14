@@ -39,6 +39,37 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
 void DrawShadowMap(Shader& shader, ShadowMap& sm, Model& model, glm::mat4& matModel, glm::vec3 lightDir);
 
+unsigned int quadVAO = 0, quadVBO = 0;
+
+void RenderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions   // texCoords
+            -1.0f, -1.0f,  0.0f, 0.0f,
+             3.0f, -1.0f,  2.0f, 0.0f,   // Trick: 只需 3 个顶点渲染全屏
+            -1.0f,  3.0f,  0.0f, 2.0f
+        };
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    }
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+}
+
+
 int main()
 {
     // 初始化 GLFW
@@ -75,6 +106,11 @@ int main()
     Shader shaderDepth("shaders/depth.vert", "shaders/depth.frag");
     Shader shaderCSM("shaders/csm_shading.vert", "shaders/csm_shading.frag");
 
+    Shader shadergbuffer("shaders/gbuffer.vert", "shaders/gbuffer.frag");
+    Shader shaderCombine("shaders/quad.vert", "shaders/quad_combine.frag");
+    Shader shaderSSR("shaders/ssr.vert", "shaders/ssr.frag");
+    Shader shaderNormal("shaders/normal.vert", "shaders/normal.frag");
+
     Shader activeShader = shader;
 
     // 加载模型
@@ -102,7 +138,7 @@ int main()
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir(1, 1, 1); // 从着色点指向光源
+        glm::vec3 lightDir(-1, 1, 1); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
 
         glm::mat4 matModel = glm::mat4(1.0f);
@@ -110,6 +146,19 @@ int main()
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
                                                 (float)SCR_WIDTH / (float)SCR_HEIGHT,
                                                 camNearPlane, camFarPlane);
+        
+        /*glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shaderNormal.use();
+        shaderNormal.setMat4("model", matModel);
+        shaderNormal.setMat4("view", view);
+        shaderNormal.setMat4("projection", projection);
+        model.Draw(shaderNormal);
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+        continue;*/
 
         #ifdef USE_SM
             DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);
@@ -119,8 +168,71 @@ int main()
             csm.DrawShadowMaps(shaderDepth, model, matModel);
         #endif
 
+
+        // 初始化g-buffer
+        GLuint gBuffer;
+        glGenFramebuffers(1, &gBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+        // 2. gPosition
+        GLuint gPos; glGenTextures(1,&gPos);
+        glBindTexture(GL_TEXTURE_2D,gPos);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_FLOAT,nullptr);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,gPos,0);
+        GLuint gNormal;
+        glGenTextures(1, &gNormal);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+        GLuint depthMap;
+        glGenTextures(1, &depthMap);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+        shadergbuffer.use();
+        GLuint attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, attachments);
+        
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shadergbuffer.setMat4("view", view);
+        shadergbuffer.setMat4("projection", projection);
+        shadergbuffer.setMat4("model", matModel);
+        model.Draw(shadergbuffer);
+
         // 清屏
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // ---------- 初始化 sceneFBO，用于存储前向渲染结果 ----------
+        GLuint sceneFBO, texSceneColor;
+        glGenFramebuffers(1, &sceneFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+
+        // 创建颜色纹理（RGB16F 更适合 HDR 场景）
+        glGenTextures(1, &texSceneColor);
+        glBindTexture(GL_TEXTURE_2D, texSceneColor);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
+                    GL_RGB, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                            GL_TEXTURE_2D, texSceneColor, 0);
+
+        // 重用 GBuffer 的深度纹理（假设已生成 texDepth）
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_TEXTURE_2D, depthMap, 0);
+
+        // 检查 FBO 完整性
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cerr << "SceneFBO is not complete!" << std::endl;
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -139,9 +251,6 @@ int main()
             glActiveTexture(GL_TEXTURE10);
             glBindTexture(GL_TEXTURE_2D_ARRAY, csm.GetShadowMapArrayTexture());
         #endif
-       
-        
-
         activeShader.use();
         activeShader.setMat4("view", view);
         activeShader.setMat4("projection", projection);
@@ -167,8 +276,82 @@ int main()
         #endif
 
         // 渲染模型
-        model.Draw(activeShader);
+        model.Draw(activeShader); // draw scene fbo
 
+        // SSR pass
+        // ---------- SSR 输出帧缓 ----------
+        GLuint ssrFBO, texSSR;
+        glGenFramebuffers(1, &ssrFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
+
+        // 创建 SSR 输出纹理（颜色）
+        glGenTextures(1, &texSSR);
+        glBindTexture(GL_TEXTURE_2D, texSSR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
+                    GL_RGB, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                            GL_TEXTURE_2D, texSSR, 0);
+
+        // 无需深度附件，复用前面已有的 texDepth
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cerr << "SSR FBO incomplete!\n";
+        
+        // ---------- SSR Pass ----------
+        glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        shaderSSR.use();
+        shaderSSR.setMat4("invProj", glm::inverse(projection));
+        shaderSSR.setMat4("proj", projection);
+        shaderSSR.setMat4("view", view);
+        shaderSSR.setFloat("thickness", 0.001f);
+        shaderSSR.setFloat("stepSize",  0.05f);
+
+        // 输入纹理绑定
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texSceneColor);
+        shaderSSR.setInt("sceneColor", 0);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        shaderSSR.setInt("normalTex", 1);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        shaderSSR.setInt("depthTex", 2);
+
+        // 渲染到 texSSR
+        RenderQuad();
+
+
+        // combine pass
+        // ---------- (5) Combine Pass ----------
+        // ---------- (5) Combine Pass ----------
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // 回到默认帧缓冲
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // 使用合成 shader
+        shaderCombine.use();
+        shaderCombine.setFloat("roughnessScale", 1.0f);  // 控制 SSR 强度
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texSceneColor); // 前向颜色输出
+        shaderCombine.setInt("sceneColor", 0);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, texSSR);        // SSR 输出
+        shaderCombine.setInt("ssrTex", 1);
+        
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, gNormal);
+        shaderCombine.setInt("normalTex", 2);
+
+        // 画全屏三角形或四边形
+        RenderQuad();
         // 交换缓冲和事件
         glfwSwapBuffers(window);
         glfwPollEvents();

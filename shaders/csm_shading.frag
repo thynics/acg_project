@@ -1,8 +1,10 @@
 #version 420
 
+layout(location = 0) out vec4 FragColor;
+
+
 #define CASCADE_COUNT 4
 
-out vec4 FragColor;
 
 in vec3 FragPosWS;
 in vec3 FragPosVS;
