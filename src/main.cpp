@@ -13,8 +13,8 @@
 #include "ShadowMap.h"
 #include "csm.h"
 
-#define USE_SM
-//#define USE_CSM
+//#define USE_SM
+#define USE_CSM
 
 
 
@@ -101,6 +101,81 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
+    // 初始化framebuffer
+
+    // ----------------初始化g-buffer----------------------------
+    GLuint gBuffer;
+    glGenFramebuffers(1, &gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    // 2. gPosition
+    GLuint gPos; glGenTextures(1,&gPos);
+    glBindTexture(GL_TEXTURE_2D,gPos);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_FLOAT,nullptr);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,gPos,0);
+    GLuint gNormal;
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+    GLuint depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    GLuint attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
+
+    // ---------- 初始化 sceneFBO，用于存储前向渲染结果 ----------
+    GLuint sceneFBO, texSceneColor;
+    glGenFramebuffers(1, &sceneFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+    // 创建颜色纹理（RGB16F 更适合 HDR 场景）
+    glGenTextures(1, &texSceneColor);
+    glBindTexture(GL_TEXTURE_2D, texSceneColor);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
+                GL_RGB, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                        GL_TEXTURE_2D, texSceneColor, 0);
+    // 重用 GBuffer 的深度纹理（假设已生成 texDepth）
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                        GL_TEXTURE_2D, depthMap, 0);
+    // 检查 FBO 完整性
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "SceneFBO is not complete!" << std::endl;
+
+    
+    // ---------- SSR 输出帧缓 ----------
+    GLuint ssrFBO, texSSR;
+    glGenFramebuffers(1, &ssrFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
+    // 创建 SSR 输出纹理（颜色）
+    glGenTextures(1, &texSSR);
+    glBindTexture(GL_TEXTURE_2D, texSSR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
+                GL_RGB, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                        GL_TEXTURE_2D, texSSR, 0);
+    // 无需深度附件，复用前面已有的 texDepth
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "SSR FBO incomplete!\n";
+
+
+    
+
     // 加载着色器
     Shader shader("shaders/default.vert", "shaders/default.frag");
     Shader shaderDepth("shaders/depth.vert", "shaders/depth.frag");
@@ -138,7 +213,7 @@ int main()
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir(--1, 1, -1); // 从着色点指向光源
+        glm::vec3 lightDir(-1, 1, -1); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
 
         glm::mat4 matModel = glm::mat4(1.0f);
@@ -169,70 +244,20 @@ int main()
         #endif
 
 
-        // 初始化g-buffer
-        GLuint gBuffer;
-        glGenFramebuffers(1, &gBuffer);
+        // ---------- gBuffer pass -----------------
         glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-        // 2. gPosition
-        GLuint gPos; glGenTextures(1,&gPos);
-        glBindTexture(GL_TEXTURE_2D,gPos);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB16F,SCR_WIDTH,SCR_HEIGHT,0,GL_RGB,GL_FLOAT,nullptr);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,gPos,0);
-        GLuint gNormal;
-        glGenTextures(1, &gNormal);
-        glBindTexture(GL_TEXTURE_2D, gNormal);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
-        GLuint depthMap;
-        glGenTextures(1, &depthMap);
-        glBindTexture(GL_TEXTURE_2D, depthMap);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
-        shadergbuffer.use();
-        GLuint attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-        glDrawBuffers(2, attachments);
-        
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shadergbuffer.use();
         shadergbuffer.setMat4("view", view);
         shadergbuffer.setMat4("projection", projection);
         shadergbuffer.setMat4("model", matModel);
         model.Draw(shadergbuffer);
 
-        // 清屏
-        // ---------- 初始化 sceneFBO，用于存储前向渲染结果 ----------
-        GLuint sceneFBO, texSceneColor;
-        glGenFramebuffers(1, &sceneFBO);
+
+        // ---------- scene pass ----------
         glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
-
-        // 创建颜色纹理（RGB16F 更适合 HDR 场景）
-        glGenTextures(1, &texSceneColor);
-        glBindTexture(GL_TEXTURE_2D, texSceneColor);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
-                    GL_RGB, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                            GL_TEXTURE_2D, texSceneColor, 0);
-
-        // 重用 GBuffer 的深度纹理（假设已生成 texDepth）
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                            GL_TEXTURE_2D, depthMap, 0);
-
-        // 检查 FBO 完整性
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cerr << "SceneFBO is not complete!" << std::endl;
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -278,25 +303,6 @@ int main()
         // 渲染模型
         model.Draw(activeShader); // draw scene fbo
 
-        // SSR pass
-        // ---------- SSR 输出帧缓 ----------
-        GLuint ssrFBO, texSSR;
-        glGenFramebuffers(1, &ssrFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
-
-        // 创建 SSR 输出纹理（颜色）
-        glGenTextures(1, &texSSR);
-        glBindTexture(GL_TEXTURE_2D, texSSR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0,
-                    GL_RGB, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                            GL_TEXTURE_2D, texSSR, 0);
-
-        // 无需深度附件，复用前面已有的 texDepth
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            std::cerr << "SSR FBO incomplete!\n";
         
         // ---------- SSR Pass ----------
         glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
@@ -328,7 +334,6 @@ int main()
 
 
         // combine pass
-        // ---------- (5) Combine Pass ----------
         // ---------- (5) Combine Pass ----------
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // 回到默认帧缓冲
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
