@@ -77,13 +77,18 @@ Mesh Model::processShape(const tinyobj::attrib_t& attrib,
     }
 
     glm::vec3 diffuseColor(1.0f); // default white
+    std::string diffuseMapPath;
     int matID = shape.mesh.material_ids.empty() ? -1 : shape.mesh.material_ids[0];
     if (matID >= 0 && matID < materials.size()) {
         const auto& mat = materials[matID];
         diffuseColor = glm::vec3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+
+        if (!mat.diffuse_texname.empty()) {
+            diffuseMapPath = directory + mat.diffuse_texname;  // e.g., "textures/sponza_column_b_diff.tga"
+        }  
     }
 
-    return Mesh(vertices, indices, diffuseColor);
+    return Mesh(vertices, indices, diffuseColor, diffuseMapPath);
 }
 
 

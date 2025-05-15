@@ -31,6 +31,8 @@ bool firstMouse = true;
 // 时间差
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+float startFrame = 0.0f;
+int frame = 0;
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -181,6 +183,8 @@ int main()
     Shader shaderDepth("shaders/depth.vert", "shaders/depth.frag");
     Shader shaderCSM("shaders/csm_shading.vert", "shaders/csm_shading.frag");
 
+    Shader shaderSimple("shaders/simple.vert", "shaders/simple.frag");
+
     Shader shadergbuffer("shaders/gbuffer.vert", "shaders/gbuffer.frag");
     Shader shaderCombine("shaders/quad.vert", "shaders/quad_combine.frag");
     Shader shaderSSR("shaders/ssr.vert", "shaders/ssr.frag");
@@ -189,7 +193,8 @@ int main()
     Shader activeShader = shader;
 
     // 加载模型
-    Model model("assets/model.obj");
+    Model model("assets/sponza/sponza.obj");
+    // Model model("assets/model.obj");
     std::pair<glm::vec3, glm::vec3> temp = model.CalculateWorldAABB(glm::mat4(1.0f));
     std::cout << temp.first.x << " " << temp.first.y << " " << temp.first.z << std::endl;
     std::cout << temp.second.x << " " << temp.second.y << " " << temp.second.z << std::endl;
@@ -202,6 +207,8 @@ int main()
     float camFarPlane = 100.0f;
     CSM csm(cascadeCount, shadowMapResolution, camNearPlane, camFarPlane);
 
+    startFrame = static_cast<float>(glfwGetTime());
+    float lastPrint = 0;
     // 渲染循环
     while (!glfwWindowShouldClose(window))
     {
@@ -209,31 +216,43 @@ int main()
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        frame++;
+        if (currentFrame - lastPrint >= 1.0f) {
+            std::cout << "FPS: " << frame / (currentFrame - startFrame) << std::endl;
+            lastPrint = currentFrame;
+        }
+
 
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir(-1, 1, -1); // 从着色点指向光源
+        glm::vec3 lightDir = glm::normalize(glm::vec3(-1, 3, -1)); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
 
-        glm::mat4 matModel = glm::mat4(1.0f);
+        glm::mat4 matModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
+
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
                                                 (float)SCR_WIDTH / (float)SCR_HEIGHT,
                                                 camNearPlane, camFarPlane);
         
-        /*glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                            
+        //-------------------------- Simple Test ----------------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        glClearColor(0.f, 0.f, 0.f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderNormal.use();
-        shaderNormal.setMat4("model", matModel);
-        shaderNormal.setMat4("view", view);
-        shaderNormal.setMat4("projection", projection);
-        model.Draw(shaderNormal);
+        shaderSimple.use();
+        shaderSimple.setMat4("model", matModel);
+        shaderSimple.setMat4("view", view);
+        shaderSimple.setMat4("projection", projection);
+        shaderSimple.setVec3("dirLight.dir", lightDir);
+        shaderSimple.setVec3("dirLight.color", lightColor);
+        shaderSimple.setVec3("viewPos", camera.Position);
+        model.Draw(shaderSimple);
         glfwSwapBuffers(window);
         glfwPollEvents();
-        continue;*/
+        continue;
 
         #ifdef USE_SM
             DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);
@@ -245,19 +264,20 @@ int main()
 
 
         // ---------- gBuffer pass -----------------
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shadergbuffer.use();
-        shadergbuffer.setMat4("view", view);
-        shadergbuffer.setMat4("projection", projection);
-        shadergbuffer.setMat4("model", matModel);
-        model.Draw(shadergbuffer);
+        // glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+        // glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // shadergbuffer.use();
+        // shadergbuffer.setMat4("view", view);
+        // shadergbuffer.setMat4("projection", projection);
+        // shadergbuffer.setMat4("model", matModel);
+        // model.Draw(shadergbuffer);
 
 
         // ---------- scene pass ----------
-        glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+        // glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -302,7 +322,10 @@ int main()
 
         // 渲染模型
         model.Draw(activeShader); // draw scene fbo
-
+        
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+        continue;
         
         // ---------- SSR Pass ----------
         glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);

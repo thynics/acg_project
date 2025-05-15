@@ -11,6 +11,7 @@ uniform mat4 lightMatrix;
 
 out vec3 FragPos;
 out vec3 Normal;
+out vec2 TexCoords;
 out vec4 shadowMapCoord;
 
 void main()
@@ -18,6 +19,7 @@ void main()
     FragPos = vec3(model * vec4(aPos, 1.0));
     Normal = mat3(transpose(inverse(model))) * aNormal;
     shadowMapCoord = lightMatrix * model * vec4(aPos, 1.0);
+    TexCoords = aTexCoords;
 
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
