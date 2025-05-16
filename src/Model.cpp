@@ -8,9 +8,12 @@ Model::Model(const std::string& path) {
     loadModel(path);
 }
 
-void Model::Draw(const Shader& shader) const {
+void Model::Draw(const Shader& shader, const glm::mat4& modelMatrix, const Frustum& frustum) const {
     for (const auto& mesh : meshes) {
-        mesh.Draw(shader);
+        AABB worldAABB = mesh.computeWorldAABB(modelMatrix);
+        if (frustum.Intersects(worldAABB)) {
+            mesh.Draw(shader);
+        }
     }
 }
 

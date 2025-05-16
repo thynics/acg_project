@@ -54,13 +54,9 @@ void Camera::ProcessMouseScroll(float yoffset) {
     if (Zoom > 45.0f) Zoom = 45.0f;
 }
 
-void Camera::updateCameraVectors() {
-    glm::vec3 front;
-    front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-    front.y = sin(glm::radians(Pitch));
-    front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
-    Front = glm::normalize(front);
-
-    Right = glm::normalize(glm::cross(Front, WorldUp));
-    Up    = glm::normalize(glm::cross(Right, Front));
+Frustum Camera::GetFrustum(const glm::mat4& projectionMatrix, const glm::mat4& viewMatrix) const {
+    glm::mat4 viewProj = projectionMatrix * viewMatrix;
+    Frustum f;
+    f.ExtractFromMatrix(viewProj);
+    return f;
 }

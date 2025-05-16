@@ -7,7 +7,7 @@
 class Model {
 public:
     Model(const std::string& path);
-    void Draw(const Shader& shader) const;
+    void Draw(const Shader& shader, const glm::mat4& modelMatrix, const Frustum& frustum) const;
     std::pair<glm::vec3, glm::vec3> CalculateWorldAABB(const glm::mat4& modelMatrix) const;
 
 private:

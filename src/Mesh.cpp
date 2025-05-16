@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stb_image.h>
 #include "TextureManager.h"
+#include "Utils.h"
 
 
 Mesh::Mesh(const std::vector<Vertex>& vertices,
@@ -14,9 +15,42 @@ Mesh::Mesh(const std::vector<Vertex>& vertices,
     if (!diffuseMapPath.empty()) {
         diffuseMap = TextureManager::GetOrLoadTexture(diffuseMapPath);
     }
-
+    computeBoundingBox();
     setupMesh();
 }
+
+void Mesh::computeBoundingBox() {
+    boundingBox = AABB();
+
+    for (const auto& vertex : vertices) {
+        boundingBox.expand(vertex.Position);
+    }
+}
+
+AABB Mesh::computeWorldAABB(const glm::mat4& modelMatrix) const {
+    glm::vec3 min = boundingBox.min;
+    glm::vec3 max = boundingBox.max;
+
+    glm::vec3 corners[8] = {
+        {min.x, min.y, min.z},
+        {max.x, min.y, min.z},
+        {min.x, max.y, min.z},
+        {max.x, max.y, min.z},
+        {min.x, min.y, max.z},
+        {max.x, min.y, max.z},
+        {min.x, max.y, max.z},
+        {max.x, max.y, max.z}
+    };
+
+    AABB worldAABB;
+    for (int i = 0; i < 8; ++i) {
+        glm::vec4 transformed = modelMatrix * glm::vec4(corners[i], 1.0f);
+        worldAABB.expand(glm::vec3(transformed));
+    }
+
+    return worldAABB;
+}
+
 
 void Mesh::setupMesh() {
     glGenVertexArrays(1, &VAO);

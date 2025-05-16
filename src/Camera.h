@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "Utils.h"
 
 enum class Camera_Movement {
     FORWARD,
@@ -11,6 +12,7 @@ enum class Camera_Movement {
     UP,
     DOWN
 };
+
 
 class Camera {
 public:
@@ -43,6 +45,7 @@ public:
     void ProcessKeyboard(Camera_Movement direction, float deltaTime);
     void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
     void ProcessMouseScroll(float yoffset);
+    Frustum GetFrustum(const glm::mat4& projectionMatrix, const glm::mat4& viewMatrix) const;
 
 private:
     void updateCameraVectors();
