@@ -238,21 +238,21 @@ int main()
         
                             
         //-------------------------- Simple Test ----------------------------
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        glClearColor(0.f, 0.f, 0.f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderSimple.use();
-        shaderSimple.setMat4("model", matModel);
-        shaderSimple.setMat4("view", view);
-        shaderSimple.setMat4("projection", projection);
-        shaderSimple.setVec3("dirLight.dir", lightDir);
-        shaderSimple.setVec3("dirLight.color", lightColor);
-        shaderSimple.setVec3("viewPos", camera.Position);
-        model.Draw(shaderSimple);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-        continue;
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        // glClearColor(0.f, 0.f, 0.f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // shaderSimple.use();
+        // shaderSimple.setMat4("model", matModel);
+        // shaderSimple.setMat4("view", view);
+        // shaderSimple.setMat4("projection", projection);
+        // shaderSimple.setVec3("dirLight.dir", lightDir);
+        // shaderSimple.setVec3("dirLight.color", lightColor);
+        // shaderSimple.setVec3("viewPos", camera.Position);
+        // model.Draw(shaderSimple);
+        // glfwSwapBuffers(window);
+        // glfwPollEvents();
+        // continue;
 
         #ifdef USE_SM
             DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);

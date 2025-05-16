@@ -13,6 +13,8 @@ public:
 private:
     std::vector<Mesh> meshes;
     std::string directory;
+    glm::vec3 minBound;
+    glm::vec3 maxBound;
 
     void loadModel(const std::string& path);
     Mesh processShape(const tinyobj::attrib_t& attrib,
