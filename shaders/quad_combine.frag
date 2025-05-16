@@ -14,7 +14,7 @@ void main()
     vec3 reflection = texture(ssrTex, TexCoords).rgb;
 
     // 简单混合：粗糙度越低反射越明显
-    float reflectance = 0; // 你也可以用 roughness texture
+    float reflectance = 0.0; // 你也可以用 roughness texture
 
     vec3 finalColor = mix(baseColor, reflection, reflectance);
     FragColor = vec4(finalColor, 1.0);

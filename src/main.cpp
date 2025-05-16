@@ -194,7 +194,7 @@ int main()
 
     // 加载模型
     Model model("assets/sponza/sponza.obj");
-    // Model model("assets/model.obj");
+    //Model model("assets/model.obj");
     std::pair<glm::vec3, glm::vec3> temp = model.CalculateWorldAABB(glm::mat4(1.0f));
     std::cout << temp.first.x << " " << temp.first.y << " " << temp.first.z << std::endl;
     std::cout << temp.second.x << " " << temp.second.y << " " << temp.second.z << std::endl;
@@ -264,20 +264,20 @@ int main()
 
 
         // ---------- gBuffer pass -----------------
-        // glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-        // glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // shadergbuffer.use();
-        // shadergbuffer.setMat4("view", view);
-        // shadergbuffer.setMat4("projection", projection);
-        // shadergbuffer.setMat4("model", matModel);
-        // model.Draw(shadergbuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shadergbuffer.use();
+        shadergbuffer.setMat4("view", view);
+        shadergbuffer.setMat4("projection", projection);
+        shadergbuffer.setMat4("model", matModel);
+        model.Draw(shadergbuffer);
 
 
         // ---------- scene pass ----------
-        // glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -323,9 +323,9 @@ int main()
         // 渲染模型
         model.Draw(activeShader); // draw scene fbo
         
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-        continue;
+        // glfwSwapBuffers(window);
+        // glfwPollEvents();
+        // continue;
         
         // ---------- SSR Pass ----------
         glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);

@@ -43,6 +43,9 @@ void Model::loadModel(const std::string &path)
     {
         meshes.push_back(processShape(attrib, shape, materials));
     }
+
+    minBound = glm::vec3( std::numeric_limits<float>::max() );
+    maxBound = glm::vec3( std::numeric_limits<float>::lowest() );
     for (const auto &mesh : meshes)
     {
         for (const auto &vertex : mesh.vertices)
