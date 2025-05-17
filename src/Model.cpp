@@ -2,6 +2,7 @@
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include <unordered_map>
+#include <array>
 #include <limits> // for std::numeric_limits
 
 Model::Model(const std::string &path)
@@ -9,8 +10,9 @@ Model::Model(const std::string &path)
     loadModel(path);
 }
 
-void Model::Draw(const Shader &shader) const
+void Model::Draw(const Shader &shader, const glm::mat4& model) const
 {
+    shader.setMat4("model", model);
     for (const auto &mesh : meshes)
     {
         mesh.Draw(shader);
@@ -116,6 +118,7 @@ Mesh Model::processShape(const tinyobj::attrib_t &attrib,
 
     return Mesh(vertices, indices, diffuseColor, diffuseMapPath);
 }
+
 
 std::pair<glm::vec3, glm::vec3> Model::CalculateWorldAABB(const glm::mat4 &modelMatrix) const
 {

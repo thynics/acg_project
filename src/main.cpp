@@ -10,6 +10,8 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Model.h"
+#include "Cube.h"
+#include "Scene.h"
 #include "ShadowMap.h"
 #include "csm.h"
 
@@ -39,7 +41,7 @@ void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
-void DrawShadowMap(Shader& shader, ShadowMap& sm, Model& model, glm::mat4& matModel, glm::vec3 lightDir);
+void DrawShadowMap(Shader &shader, ShadowMap &sm, Scene &scene, glm::vec3 lightDir);
 
 unsigned int quadVAO = 0, quadVBO = 0;
 
@@ -193,9 +195,30 @@ int main()
     Shader activeShader = shader;
 
     // 加载模型
-    Model model("assets/sponza/sponza.obj");
+    //Model model("assets/sponza/sponza.obj");
     //Model model("assets/model.obj");
-    std::pair<glm::vec3, glm::vec3> temp = model.CalculateWorldAABB(glm::mat4(1.0f));
+    //Model model("assets/town/old town block.obj");
+    //Model model("assets/gundam/gundam.obj");
+    //Model model("assets/antonius/Antonius_C.obj");
+    Model model("assets/rossbaendiger/Rossbaendiger_C.obj");
+
+    // Cube base(glm::scale(glm::mat4(1.0f), glm::vec3(100.0f, 0.5f, 100.0f)));
+    Model base("assets/cube.obj");
+
+    glm::mat4 matModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+    //matModel = glm::rotate(matModel, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    matModel = glm::translate(matModel, glm::vec3(0, 3, 0));
+
+    glm::mat4 matModelBase = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f, 0.5f, 20.0f));
+
+    Scene scene;
+    scene.AddModelInstance(&model, matModel);
+    scene.AddModelInstance(&base, matModelBase);
+    scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(20.0f,0,0)));
+    scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(40.0f,0,0)));
+    scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(60.0f,0,0)));
+    
+    std::pair<glm::vec3, glm::vec3> temp = scene.CalculateWorldAABB();
     std::cout << temp.first.x << " " << temp.first.y << " " << temp.first.z << std::endl;
     std::cout << temp.second.x << " " << temp.second.y << " " << temp.second.z << std::endl;
     
@@ -204,7 +227,7 @@ int main()
 
     int cascadeCount = 4;
     float camNearPlane = 0.1f;
-    float camFarPlane = 100.0f;
+    float camFarPlane = 50.0f;
     CSM csm(cascadeCount, shadowMapResolution, camNearPlane, camFarPlane);
 
     startFrame = static_cast<float>(glfwGetTime());
@@ -226,10 +249,8 @@ int main()
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir = glm::normalize(glm::vec3(-1, 3, -1)); // 从着色点指向光源
+        glm::vec3 lightDir = glm::normalize(glm::vec3(-1, 1, -1)); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
-
-        glm::mat4 matModel = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f));
 
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom),
@@ -240,7 +261,7 @@ int main()
         //-------------------------- Simple Test ----------------------------
         // glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        // glClearColor(0.f, 0.f, 0.f, 1.0f);
+        // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // shaderSimple.use();
         // shaderSimple.setMat4("model", matModel);
@@ -249,17 +270,21 @@ int main()
         // shaderSimple.setVec3("dirLight.dir", lightDir);
         // shaderSimple.setVec3("dirLight.color", lightColor);
         // shaderSimple.setVec3("viewPos", camera.Position);
-        // model.Draw(shaderSimple);
+        // // model.Draw(shaderSimple);
+        // // shaderSimple.setMat4("model", matModelBase);
+        // // base.Draw(shaderSimple);
+        // scene.Draw(shaderSimple);
         // glfwSwapBuffers(window);
         // glfwPollEvents();
         // continue;
 
         #ifdef USE_SM
-            DrawShadowMap(shaderDepth, sm, model, matModel, lightDir);
+            DrawShadowMap(shaderDepth, sm, scene, lightDir);
         #endif
         #ifdef USE_CSM
-            csm.ComputeLightSpaceMatrix(view, projection, matModel, camera.Position, camera.Front, model, lightDir);
-            csm.DrawShadowMaps(shaderDepth, model, matModel);
+            csm.ComputeLightSpaceMatrix(view, projection, camera.Position, camera.Front, scene, lightDir);
+            csm.DrawShadowMaps(shaderDepth, scene);
+            //csm.DrawShadowMaps(shaderDepth, base, matModelBase);
         #endif
 
 
@@ -272,7 +297,9 @@ int main()
         shadergbuffer.setMat4("view", view);
         shadergbuffer.setMat4("projection", projection);
         shadergbuffer.setMat4("model", matModel);
-        model.Draw(shadergbuffer);
+        // model.Draw(shadergbuffer, matModel);
+        // base.Draw(shadergbuffer, matModelBase);
+        scene.Draw(shadergbuffer);
 
 
         // ---------- scene pass ----------
@@ -321,7 +348,9 @@ int main()
         #endif
 
         // 渲染模型
-        model.Draw(activeShader); // draw scene fbo
+        // model.Draw(activeShader, matModel); // draw scene fbo
+        // base.Draw(activeShader, matModelBase);
+        scene.Draw(activeShader);
         
         // glfwSwapBuffers(window);
         // glfwPollEvents();
@@ -390,12 +419,12 @@ int main()
 }
 
 
-void DrawShadowMap(Shader &shader, ShadowMap &sm, Model &model, glm::mat4& matModel, glm::vec3 lightDir)
+void DrawShadowMap(Shader &shader, ShadowMap &sm, Scene &scene, glm::vec3 lightDir)
 {
     sm.BindForWriting();
     shader.use();
 
-    std::pair<glm::vec3, glm::vec3> aabb = model.CalculateWorldAABB(matModel);
+    std::pair<glm::vec3, glm::vec3> aabb = scene.CalculateWorldAABB();
     glm::vec3 aabbCenter((aabb.first + aabb.second)*0.5f);
     float radius = glm::distance(aabbCenter, aabb.first);
     glm::vec3 shadowMapEye(aabbCenter + glm::normalize(lightDir)*radius);
@@ -407,9 +436,9 @@ void DrawShadowMap(Shader &shader, ShadowMap &sm, Model &model, glm::mat4& matMo
     sm.matView = matShadowView;
     sm.matProj = matShadowProj;
 
-    shader.setMat4("modelViewProjectionMatrix", matShadowProj*matShadowView*matModel);
+    shader.setMat4("ViewProjectionMatrix", matShadowProj*matShadowView);
     
-    model.Draw(shader);
+    scene.Draw(shader);
 
     sm.Unbind();
 }

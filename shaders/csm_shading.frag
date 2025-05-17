@@ -50,7 +50,16 @@ void main()
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(dirLight.dir);
 
-    vec3 color = hasDiffuseMap ? texture(material_diffuseMap, TexCoords).rgb : material_diffuseColor;
+    vec3 colorMultiplier[CASCADE_COUNT];
+    colorMultiplier[0] = vec3(0,1,1);
+    colorMultiplier[1] = vec3(1,0,0);
+    colorMultiplier[2] = vec3(0,1,0);
+    colorMultiplier[3] = vec3(0,0,1);
+    vec3 color = (hasDiffuseMap ? texture(material_diffuseMap, TexCoords).rgb : material_diffuseColor) 
+        * colorMultiplier[cascadeIndex];
+
+    // 环境光
+    vec3 ambient = 0.2 * color;
 
     // 漫反射
     float diff = max(dot(norm, lightDir), 0.0);
@@ -62,7 +71,7 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0); // shininess=32
     vec3 specular = spec * dirLight.color;
 
-    vec3 result = visibility * (diffuse + specular);
+    vec3 result = visibility * (ambient + diffuse + specular);
 
     FragColor = vec4(result, 1.0);
 

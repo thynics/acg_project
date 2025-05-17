@@ -50,8 +50,9 @@ void main()
     FragColor = vec4(result, 1.0);*/
 
     float visibility = textureProj(shadowMapTex, shadowMapCoord);
-    // float depth = texture(shadowMapTex, shadowMapCoord.xy / shadowMapCoord.w).r;
-    // float bias = 0.005f;
+    //float depth = texture(shadowMapTex, shadowMapCoord.xy / shadowMapCoord.w).r;
+    //float visibility = (depth >= (shadowMapCoord.z / shadowMapCoord.w)) ? 1.0 : 0.0;
+    //float bias = 0.005f;
     // float visibility = (depth + bias >= (shadowMapCoord.z / shadowMapCoord.w)) ? 1.0 : 0.0;
 
     vec3 color = hasDiffuseMap ? texture(material_diffuseMap, TexCoords).rgb : material_diffuseColor;

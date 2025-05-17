@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <glad/glad.h>
 #include "Model.h"
+#include "Scene.h"
 
 class CSM {
 public:
@@ -17,9 +18,9 @@ public:
 
     GLuint GetDepthMapFBO() const;
 
-    void ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& matCamProj, const glm::mat4& matModel, 
-        const glm::vec3& camPos, const glm::vec3& camDir, const Model& model, const glm::vec3& lightDir);
-    void DrawShadowMaps(Shader &shader, Model &model, glm::mat4& matModel);
+    void ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& matCamProj,
+    const glm::vec3& camPos, const glm::vec3& camDir, Scene& scene, const glm::vec3& lightDir);
+    void DrawShadowMaps(Shader &shader, Scene &scene);
 
 private:
     void InitShadowMaps();

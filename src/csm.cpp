@@ -15,8 +15,8 @@ CSM::CSM(unsigned int cascadesCount, unsigned int shadowMapResolution, float nea
     InitShadowMaps();
     ComputeCascadeSplits();
 
-    polygonOffset_factor = 0.25f;
-    polygonOffset_units = 100000.0f;
+    polygonOffset_factor = 4;//0.05f;
+    polygonOffset_units = 10;//250000.0f;
 }
 
 CSM::~CSM() {
@@ -32,8 +32,10 @@ void CSM::InitShadowMaps()
     glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapArray);
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, shadowMapResolution, shadowMapResolution, cascadesCount, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
@@ -65,10 +67,10 @@ void CSM::ComputeCascadeSplits() {
     }
 }
 
-void CSM::ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& matCamProj, const glm::mat4& matModel, 
-    const glm::vec3& camPos, const glm::vec3& camDir, const Model& model, const glm::vec3& lightDir){
+void CSM::ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& matCamProj,
+    const glm::vec3& camPos, const glm::vec3& camDir, Scene& scene, const glm::vec3& lightDir){
     
-    std::pair<glm::vec3, glm::vec3> aabb = model.CalculateWorldAABB(matModel);
+    std::pair<glm::vec3, glm::vec3> aabb = scene.CalculateWorldAABB();
     glm::vec3 aabbCenter((aabb.first + aabb.second)*0.5f);
     float modelRadius = glm::distance(aabbCenter, aabb.first);
     
@@ -108,10 +110,22 @@ void CSM::ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& 
         
         float backDist = glm::distance(aabbCenter, sphereCenterWS) + modelRadius;
 
-        glm::vec3 shadowMapEye = sphereCenterWS + glm::normalize(lightDir) * backDist;
-        glm::vec3 shadowMapAt = sphereCenterWS;
+        glm::vec3 shadowMapEye(0.0f);
+        glm::vec3 shadowMapAt = -lightDir;
         glm::vec3 shadowMapUp(0.0f, 1.0f, 0.0f);
         glm::mat4 matShadowView = glm::lookAt(shadowMapEye, shadowMapAt, shadowMapUp);
+
+        float cascadeAABBSize = sphereRadius * 2.0f;
+        float worldUnitPerPixel = cascadeAABBSize / shadowMapResolution;
+        glm::vec4 sphereCenterLS4 = matShadowView * glm::vec4(sphereCenterWS, 1.0f);
+        glm::vec3 sphereCenterLS = glm::vec3(sphereCenterLS4.x, sphereCenterLS4.y, sphereCenterLS4.z) / sphereCenterLS4.w;
+        sphereCenterLS -= glm::vec3(std::fmodf(sphereCenterLS.x, worldUnitPerPixel), std::fmodf(sphereCenterLS.y, worldUnitPerPixel), 0.f);
+        glm::vec4 sphereCenterWS4 = glm::inverse(matShadowView) * glm::vec4(sphereCenterLS, 1.0f);
+        sphereCenterWS = glm::vec3(sphereCenterWS4.x, sphereCenterWS4.y, sphereCenterWS4.z) / sphereCenterWS4.w;
+
+        shadowMapEye = sphereCenterWS + glm::normalize(lightDir) * backDist;
+        shadowMapAt = sphereCenterWS;
+        matShadowView = glm::lookAt(shadowMapEye, shadowMapAt, shadowMapUp);
         glm::mat4 matShadowProj = glm::ortho(-sphereRadius, sphereRadius, -sphereRadius, sphereRadius, 0.f, backDist * 2.0f);
 
         lightSpaceMatrices[i] = glm::translate(glm::vec3(0.5f)) * glm::scale(glm::vec3(0.5f)) * matShadowProj * matShadowView;
@@ -119,7 +133,7 @@ void CSM::ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& 
     }
 }
 
-void CSM::DrawShadowMaps(Shader &shader, Model &model, glm::mat4& matModel)
+void CSM::DrawShadowMaps(Shader &shader, Scene &scene)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 
@@ -134,9 +148,9 @@ void CSM::DrawShadowMaps(Shader &shader, Model &model, glm::mat4& matModel)
         glPolygonOffset(polygonOffset_factor, polygonOffset_units);
 
         shader.use();
-        shader.setMat4("modelViewProjectionMatrix", shadowViewProjMatrices[i]*matModel);
+        shader.setMat4("ViewProjectionMatrix", shadowViewProjMatrices[i]);
 
-        model.Draw(shader);
+        scene.Draw(shader);
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
