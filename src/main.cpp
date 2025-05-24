@@ -216,7 +216,7 @@ int main()
     scene.AddModelInstance(&base, matModelBase);
     scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(20.0f,0,0)));
     scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(40.0f,0,0)));
-    scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(60.0f,0,0)));
+    // scene.AddModelInstance(&model, glm::translate(matModel, glm::vec3(60.0f,0,0)));
     
     std::pair<glm::vec3, glm::vec3> temp = scene.CalculateWorldAABB();
     std::cout << temp.first.x << " " << temp.first.y << " " << temp.first.z << std::endl;
@@ -227,7 +227,7 @@ int main()
 
     int cascadeCount = 4;
     float camNearPlane = 0.1f;
-    float camFarPlane = 50.0f;
+    float camFarPlane = 30.0f;
     CSM csm(cascadeCount, shadowMapResolution, camNearPlane, camFarPlane);
 
     startFrame = static_cast<float>(glfwGetTime());
@@ -249,7 +249,7 @@ int main()
         processInput(window);
 
         // 设置平行光
-        glm::vec3 lightDir = glm::normalize(glm::vec3(-1, 1, -1)); // 从着色点指向光源
+        glm::vec3 lightDir = glm::normalize(glm::vec3(-1, 0.5, -1)); // 从着色点指向光源
         glm::vec3 lightColor(1.0f);
 
         glm::mat4 view = camera.GetViewMatrix();
@@ -341,10 +341,13 @@ int main()
             std::vector<glm::mat4> lightMatrices = csm.GetLightSpaceMatrices();
             for (int i = 0; i < cascadeCount; i++){
                 std::string float_name = "cascadeSplit[" + std::to_string(i) + "]"; 
-                activeShader.setFloat(float_name, cascadeSplit[i+1]);
+                activeShader.setFloat(float_name, cascadeSplit[i]);
                 std::string mat4_name = "lightMatrices[" + std::to_string(i) + "]";
                 activeShader.setMat4(mat4_name, lightMatrices[i]);
             }
+            activeShader.setFloat("nearPlane", camNearPlane);
+            activeShader.setFloat("splitBlendRatio", csm.blendRatio);
+            activeShader.setInt("shadowMapResolution", shadowMapResolution);
         #endif
 
         // 渲染模型

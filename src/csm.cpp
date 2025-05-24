@@ -9,7 +9,11 @@ CSM::CSM(unsigned int cascadesCount, unsigned int shadowMapResolution, float nea
     : cascadesCount(cascadesCount), shadowMapResolution(shadowMapResolution),
       nearPlane(nearPlane), farPlane(farPlane)
 {
-    cascadeSplits.resize(cascadesCount+1);
+
+    blendRatio = 0.5f;
+
+    cascadeSplitsNear.resize(cascadesCount);
+    cascadeSplitsFar.resize(cascadesCount);
     lightSpaceMatrices.resize(cascadesCount);
     shadowViewProjMatrices.resize(cascadesCount);
     InitShadowMaps();
@@ -17,6 +21,7 @@ CSM::CSM(unsigned int cascadesCount, unsigned int shadowMapResolution, float nea
 
     polygonOffset_factor = 4;//0.05f;
     polygonOffset_units = 10;//250000.0f;
+
 }
 
 CSM::~CSM() {
@@ -42,8 +47,8 @@ void CSM::InitShadowMaps()
     float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
     glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    // glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 
     // glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     // glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowMapArray, 0);
@@ -57,13 +62,19 @@ void CSM::ComputeCascadeSplits() {
     float range = farPlane - nearPlane;
     float ratio = farPlane / nearPlane;
 
-    cascadeSplits[0] = nearPlane;
-    for (unsigned int i = 1; i <= cascadesCount; ++i) {
-        float p = i / static_cast<float>(cascadesCount);
+    //cascadeSplitsClean[0] = nearPlane;
+    for (unsigned int i = 0; i < cascadesCount; ++i) {
+        float p = (i+1) / static_cast<float>(cascadesCount);
         float logSplit = nearPlane * std::pow(ratio, p);
         float linearSplit = nearPlane + range * p;
         float split = lambda * logSplit + (1 - lambda) * linearSplit;
-        cascadeSplits[i] = split;
+        cascadeSplitsFar[i] = split;
+    }
+
+    cascadeSplitsNear[0] = nearPlane;
+    cascadeSplitsNear[1] = cascadeSplitsFar[0]-blendRatio*(cascadeSplitsFar[0]-cascadeSplitsNear[0]);
+    for (unsigned int i = 2; i < cascadesCount; ++i){
+        cascadeSplitsNear[i] = cascadeSplitsFar[i-1]-blendRatio*(cascadeSplitsFar[i-1]-cascadeSplitsFar[i-2]); 
     }
 }
 
@@ -76,8 +87,9 @@ void CSM::ComputeLightSpaceMatrix(const glm::mat4& matCamView, const glm::mat4& 
     
 
     for (unsigned int i = 0; i < cascadesCount; ++i) {
-        float zCascadeNear = -cascadeSplits[i];
-        float zCascadeFar = -cascadeSplits[i+1];
+        float zCascadeNear = -cascadeSplitsNear[i];
+        //float zCascadeNear = (i==0) ? -nearPlane : -cascadeSplitsFar[i-1];
+        float zCascadeFar = -cascadeSplitsFar[i];
 
         glm::vec4 cascadeNearNDC = matCamProj * glm::vec4(0,0,zCascadeNear,1);
         float zCascadeNearNDC = cascadeNearNDC.z / cascadeNearNDC.w;
@@ -144,8 +156,8 @@ void CSM::DrawShadowMaps(Shader &shader, Scene &scene)
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
         // TODO: PolygonOffset
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(polygonOffset_factor, polygonOffset_units);
+        // glEnable(GL_POLYGON_OFFSET_FILL);
+        // glPolygonOffset(polygonOffset_factor, polygonOffset_units);
 
         shader.use();
         shader.setMat4("ViewProjectionMatrix", shadowViewProjMatrices[i]);
@@ -169,7 +181,7 @@ const std::vector<glm::mat4> &CSM::GetLightSpaceMatrices() const
 
 const std::vector<float> &CSM::GetCascadeSplits() const
 {
-    return cascadeSplits;
+    return cascadeSplitsFar;
 }
 
 GLuint CSM::GetDepthMapFBO() const

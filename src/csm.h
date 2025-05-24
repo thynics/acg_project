@@ -22,6 +22,8 @@ public:
     const glm::vec3& camPos, const glm::vec3& camDir, Scene& scene, const glm::vec3& lightDir);
     void DrawShadowMaps(Shader &shader, Scene &scene);
 
+    float blendRatio;
+
 private:
     void InitShadowMaps();
     void ComputeCascadeSplits();
@@ -33,6 +35,8 @@ private:
     float nearPlane;
     float farPlane;
 
+
+
     float polygonOffset_factor;
     float polygonOffset_units;
 
@@ -41,7 +45,8 @@ private:
 
     std::vector<glm::mat4> lightSpaceMatrices;
     std::vector<glm::mat4> shadowViewProjMatrices;
-    std::vector<float> cascadeSplits;
+    std::vector<float> cascadeSplitsNear;
+    std::vector<float> cascadeSplitsFar;
 
 };
 
